@@ -2233,7 +2233,7 @@ static int si_calculate_adjusted_tdp_limits(struct amdgpu_device *adev,
 	if (tdp_adjustment > (u32)adev->pm.dpm.tdp_od_limit)
 		return -EINVAL;
 
-	max_tdp_limit = ((100 + 100) * adev->pm.dpm.tdp_limit) / 100;
+	max_tdp_limit = ((100 + adev->pm.dpm.tdp_od_limit) * adev->pm.dpm.tdp_limit) / 100;
 
 	if (adjust_polarity) {
 		*tdp_limit = ((100 + tdp_adjustment) * adev->pm.dpm.tdp_limit) / 100;
@@ -2247,9 +2247,9 @@ static int si_calculate_adjusted_tdp_limits(struct amdgpu_device *adev,
 			*near_tdp_limit = 0;
 	}
 
-	if ((*tdp_limit <= 0) || (*tdp_limit > max_tdp_limit))
+	if ((*tdp_limit == 0) || (*tdp_limit > max_tdp_limit))
 		return -EINVAL;
-	if ((*near_tdp_limit <= 0) || (*near_tdp_limit > *tdp_limit))
+	if ((*near_tdp_limit == 0) || (*near_tdp_limit > *tdp_limit))
 		return -EINVAL;
 
 	return 0;
@@ -2364,12 +2364,12 @@ static u16 si_calculate_power_efficiency_ratio(struct amdgpu_device *adev,
 	if ((prev_vddc == 0) || (curr_vddc == 0))
 		return 0;
 
-	n = div64_u64((u64)1024 * curr_vddc * curr_vddc * ((u64)1000 + margin), (u64)1000);
-	d = prev_vddc * prev_vddc;
+	n = div64_u64((u64)1024 * prev_vddc * prev_vddc * ((u64)1000 + margin), (u64)1000);
+	d = curr_vddc * curr_vddc;
 	pwr_efficiency_ratio = div64_u64(n, d);
 
 	if (pwr_efficiency_ratio > (u64)0xFFFF)
-		return 0;
+		return 0xFFFF;
 
 	return (u16)pwr_efficiency_ratio;
 }
@@ -3072,8 +3072,6 @@ static int si_get_vce_clock_voltage(struct amdgpu_device *adev,
 	/* if no match return the highest voltage */
 	if (ret)
 		*voltage = table->entries[table->count - 1].v;
-
-	*voltage = si_get_lower_of_leakage_and_vce_voltage(adev, *voltage);
 
 	return ret;
 }
@@ -5134,7 +5132,7 @@ static int si_populate_smc_acpi_state(struct amdgpu_device *adev,
 }
 
 static int si_populate_ulv_state(struct amdgpu_device *adev,
-				 struct SISLANDS_SMC_SWSTATE_SINGLE *state)
+				 struct SISLANDS_SMC_SWSTATE *state)
 {
 	struct evergreen_power_info *eg_pi = evergreen_get_pi(adev);
 	struct si_power_info *si_pi = si_get_pi(adev);
@@ -5143,19 +5141,19 @@ static int si_populate_ulv_state(struct amdgpu_device *adev,
 	int ret;
 
 	ret = si_convert_power_level_to_smc(adev, &ulv->pl,
-					    &state->level);
+					    &state->levels[0]);
 	if (!ret) {
 		if (eg_pi->sclk_deep_sleep) {
 			if (sclk_in_sr <= SCLK_MIN_DEEPSLEEP_FREQ)
-				state->level.stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_BYPASS;
+				state->levels[0].stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_BYPASS;
 			else
-				state->level.stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_THROTTLE;
+				state->levels[0].stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_THROTTLE;
 		}
 		if (ulv->one_pcie_lane_in_ulv)
 			state->flags |= PPSMC_SWSTATE_FLAG_PCIE_X1;
-		state->level.arbRefreshState = (u8)(SISLANDS_ULV_STATE_ARB_INDEX);
-		state->level.ACIndex = 1;
-		state->level.std_vddc = state->level.vddc;
+		state->levels[0].arbRefreshState = (u8)(SISLANDS_ULV_STATE_ARB_INDEX);
+		state->levels[0].ACIndex = 1;
+		state->levels[0].std_vddc = state->levels[0].vddc;
 		state->levelCount = 1;
 
 		state->flags |= PPSMC_SWSTATE_FLAG_DC;
@@ -5799,8 +5797,8 @@ static int si_upload_ulv_state(struct amdgpu_device *adev)
 	if (ulv->supported && ulv->pl.vddc) {
 		u32 address = si_pi->state_table_start +
 			offsetof(SISLANDS_SMC_STATETABLE, ULVState);
-		struct SISLANDS_SMC_SWSTATE_SINGLE *smc_state = &si_pi->smc_statetable.ULVState;
-		u32 state_size = sizeof(struct SISLANDS_SMC_SWSTATE_SINGLE);
+		SISLANDS_SMC_SWSTATE *smc_state = &si_pi->smc_statetable.ULVState;
+		u32 state_size = struct_size(smc_state, levels, 1);
 
 		memset(smc_state, 0, state_size);
 
