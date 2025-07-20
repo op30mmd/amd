@@ -5780,7 +5780,7 @@ static int si_upload_ulv_state(struct amdgpu_device *adev)
 	if (ulv->supported && ulv->pl.vddc) {
 		u32 address = si_pi->state_table_start +
 			offsetof(SISLANDS_SMC_STATETABLE, ULVState);
-		SISLANDS_SMC_SWSTATE *smc_state = (SISLANDS_SMC_SWSTATE *)&si_pi->smc_statetable.ULVState;
+		SISLANDS_SMC_SWSTATE *smc_state = &si_pi->smc_statetable.ULVState;
 		u32 state_size = struct_size(smc_state, levels, 1);
 
 		memset(smc_state, 0, state_size);
