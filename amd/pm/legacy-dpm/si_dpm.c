@@ -3028,23 +3028,6 @@ static int si_init_smc_spll_table(struct amdgpu_device *adev)
 	return ret;
 }
 
-static u16 si_get_lower_of_leakage_and_vce_voltage(struct amdgpu_device *adev,
-						   u16 vce_voltage)
-{
-	u16 highest_leakage = 0;
-	struct si_power_info *si_pi = si_get_pi(adev);
-	int i;
-
-	for (i = 0; i < si_pi->leakage_voltage.count; i++){
-		if (highest_leakage < si_pi->leakage_voltage.entries[i].voltage)
-			highest_leakage = si_pi->leakage_voltage.entries[i].voltage;
-	}
-
-	if (si_pi->leakage_voltage.count && (highest_leakage < vce_voltage))
-		return highest_leakage;
-
-	return vce_voltage;
-}
 
 static int si_get_vce_clock_voltage(struct amdgpu_device *adev,
 				    u32 evclk, u32 ecclk, u16 *voltage)
@@ -5262,7 +5245,7 @@ static int si_init_smc_table(struct amdgpu_device *adev)
 		return ret;
 
 	if (ulv->supported && ulv->pl.vddc) {
-		ret = si_populate_ulv_state(adev, &table->ULVState);
+		ret = si_populate_ulv_state(adev, (struct SISLANDS_SMC_SWSTATE *)(&table->ULVState));
 		if (ret)
 			return ret;
 
