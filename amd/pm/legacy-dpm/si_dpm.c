@@ -5785,7 +5785,7 @@ static int si_upload_ulv_state(struct amdgpu_device *adev)
 
 		memset(smc_state, 0, state_size);
 
-		ret = si_populate_ulv_state(adev, smc_state);
+		ret = si_populate_ulv_state(adev, (struct SISLANDS_SMC_SWSTATE_SINGLE *)smc_state);
 		if (!ret)
 			ret = amdgpu_si_copy_bytes_to_smc(adev, address, (u8 *)smc_state,
 							  state_size, si_pi->sram_end);
