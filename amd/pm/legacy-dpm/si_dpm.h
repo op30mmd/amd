@@ -962,6 +962,15 @@ struct si_ulv_param {
 	bool one_pcie_lane_in_ulv;
 };
 
+struct SISLANDS_SMC_SWSTATE_SINGLE
+{
+    uint8_t                             flags;
+    uint8_t                             levelCount;
+    uint8_t                             padding2;
+    uint8_t                             padding3;
+    NISLANDS_SMC_HW_PERFORMANCE_LEVEL   level;
+};
+
 struct si_power_info {
 	/* must be first! */
 	struct ni_power_info ni;
