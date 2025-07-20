@@ -34,8 +34,8 @@
 #include "gfx_v6_0.h"
 #include "r600_dpm.h"
 #include "sid.h"
-#include "si_dpm.h"
 #include "../include/pptable.h"
+#include "si_dpm.h"
 #include <linux/math64.h>
 #include <linux/seq_file.h>
 #include <linux/firmware.h>
