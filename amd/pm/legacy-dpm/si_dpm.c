@@ -34,8 +34,8 @@
 #include "gfx_v6_0.h"
 #include "r600_dpm.h"
 #include "sid.h"
-#include "si_dpm.h"
 #include "../include/pptable.h"
+#include "si_dpm.h"
 #include <linux/math64.h>
 #include <linux/seq_file.h>
 #include <linux/firmware.h>
@@ -2233,7 +2233,7 @@ static int si_calculate_adjusted_tdp_limits(struct amdgpu_device *adev,
 	if (tdp_adjustment > (u32)adev->pm.dpm.tdp_od_limit)
 		return -EINVAL;
 
-	max_tdp_limit = ((100 + 100) * adev->pm.dpm.tdp_limit) / 100;
+	max_tdp_limit = ((100 + adev->pm.dpm.tdp_od_limit) * adev->pm.dpm.tdp_limit) / 100;
 
 	if (adjust_polarity) {
 		*tdp_limit = ((100 + tdp_adjustment) * adev->pm.dpm.tdp_limit) / 100;
@@ -2247,9 +2247,9 @@ static int si_calculate_adjusted_tdp_limits(struct amdgpu_device *adev,
 			*near_tdp_limit = 0;
 	}
 
-	if ((*tdp_limit <= 0) || (*tdp_limit > max_tdp_limit))
+	if ((*tdp_limit == 0) || (*tdp_limit > max_tdp_limit))
 		return -EINVAL;
-	if ((*near_tdp_limit <= 0) || (*near_tdp_limit > *tdp_limit))
+	if ((*near_tdp_limit == 0) || (*near_tdp_limit > *tdp_limit))
 		return -EINVAL;
 
 	return 0;
@@ -2364,12 +2364,12 @@ static u16 si_calculate_power_efficiency_ratio(struct amdgpu_device *adev,
 	if ((prev_vddc == 0) || (curr_vddc == 0))
 		return 0;
 
-	n = div64_u64((u64)1024 * curr_vddc * curr_vddc * ((u64)1000 + margin), (u64)1000);
-	d = prev_vddc * prev_vddc;
+	n = div64_u64((u64)1024 * prev_vddc * prev_vddc * ((u64)1000 + margin), (u64)1000);
+	d = curr_vddc * curr_vddc;
 	pwr_efficiency_ratio = div64_u64(n, d);
 
 	if (pwr_efficiency_ratio > (u64)0xFFFF)
-		return 0;
+		return 0xFFFF;
 
 	return (u16)pwr_efficiency_ratio;
 }
@@ -3028,23 +3028,6 @@ static int si_init_smc_spll_table(struct amdgpu_device *adev)
 	return ret;
 }
 
-static u16 si_get_lower_of_leakage_and_vce_voltage(struct amdgpu_device *adev,
-						   u16 vce_voltage)
-{
-	u16 highest_leakage = 0;
-	struct si_power_info *si_pi = si_get_pi(adev);
-	int i;
-
-	for (i = 0; i < si_pi->leakage_voltage.count; i++){
-		if (highest_leakage < si_pi->leakage_voltage.entries[i].voltage)
-			highest_leakage = si_pi->leakage_voltage.entries[i].voltage;
-	}
-
-	if (si_pi->leakage_voltage.count && (highest_leakage < vce_voltage))
-		return highest_leakage;
-
-	return vce_voltage;
-}
 
 static int si_get_vce_clock_voltage(struct amdgpu_device *adev,
 				    u32 evclk, u32 ecclk, u16 *voltage)
@@ -3072,8 +3055,6 @@ static int si_get_vce_clock_voltage(struct amdgpu_device *adev,
 	/* if no match return the highest voltage */
 	if (ret)
 		*voltage = table->entries[table->count - 1].v;
-
-	*voltage = si_get_lower_of_leakage_and_vce_voltage(adev, *voltage);
 
 	return ret;
 }
@@ -5264,7 +5245,7 @@ static int si_init_smc_table(struct amdgpu_device *adev)
 		return ret;
 
 	if (ulv->supported && ulv->pl.vddc) {
-		ret = si_populate_ulv_state(adev, &table->ULVState);
+		ret = si_populate_ulv_state(adev, (struct SISLANDS_SMC_SWSTATE *)(&table->ULVState));
 		if (ret)
 			return ret;
 
