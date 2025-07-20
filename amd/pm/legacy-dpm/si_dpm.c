@@ -5115,7 +5115,7 @@ static int si_populate_smc_acpi_state(struct amdgpu_device *adev,
 }
 
 static int si_populate_ulv_state(struct amdgpu_device *adev,
-				 struct SISLANDS_SMC_SWSTATE_SINGLE *state)
+				 struct SISLANDS_SMC_SWSTATE *state)
 {
 	struct evergreen_power_info *eg_pi = evergreen_get_pi(adev);
 	struct si_power_info *si_pi = si_get_pi(adev);
@@ -5124,19 +5124,19 @@ static int si_populate_ulv_state(struct amdgpu_device *adev,
 	int ret;
 
 	ret = si_convert_power_level_to_smc(adev, &ulv->pl,
-					    &state->level);
+					    &state->levels[0]);
 	if (!ret) {
 		if (eg_pi->sclk_deep_sleep) {
 			if (sclk_in_sr <= SCLK_MIN_DEEPSLEEP_FREQ)
-				state->level.stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_BYPASS;
+				state->levels[0].stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_BYPASS;
 			else
-				state->level.stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_THROTTLE;
+				state->levels[0].stateFlags |= PPSMC_STATEFLAG_DEEPSLEEP_THROTTLE;
 		}
 		if (ulv->one_pcie_lane_in_ulv)
 			state->flags |= PPSMC_SWSTATE_FLAG_PCIE_X1;
-		state->level.arbRefreshState = (u8)(SISLANDS_ULV_STATE_ARB_INDEX);
-		state->level.ACIndex = 1;
-		state->level.std_vddc = state->level.vddc;
+		state->levels[0].arbRefreshState = (u8)(SISLANDS_ULV_STATE_ARB_INDEX);
+		state->levels[0].ACIndex = 1;
+		state->levels[0].std_vddc = state->levels[0].vddc;
 		state->levelCount = 1;
 
 		state->flags |= PPSMC_SWSTATE_FLAG_DC;
